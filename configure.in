@@ -1,0 +1,28 @@
+AC_PREREQ([2.63])
+AC_INIT(mediasegmenter, 0.0.1, iliya.gr@gmail.com, mediasegmenter, https://github.com/iliya-gr/mediasegmenter)
+AC_CONFIG_SRCDIR([mediasegmenter.c])
+AC_CONFIG_HEADERS([config.h])
+AM_INIT_AUTOMAKE([1.11 foreign])
+
+# Checks for programs.
+AC_PROG_CC
+
+PKG_CHECK_MODULES([AVFORMAT], [libavformat >= 54.6.100],  [], [AC_MSG_ERROR([libavformat version 54.6.100 or later required])])
+PKG_CHECK_MODULES([AVUTIL],   [libavutil   >= 51.54.100], [], [AC_MSG_ERROR([libavutil version 51.54.100 or later required])])
+PKG_CHECK_MODULES([AVCODEC],  [libavcodec  >= 54.23.100], [], [AC_MSG_ERROR([libavcodec version 54.23.100 or later required])])
+
+# Checks for header files.
+AC_CHECK_HEADERS([stdlib.h string.h getopt.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_TYPE_INT64_T
+AC_TYPE_SIZE_T
+
+# Checks for library functions.
+AC_FUNC_ALLOCA
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
+AC_CHECK_FUNCS([strndup])
+
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT

@@ -1,0 +1,11 @@
+*~
+*.o
+*.cache
+*.log
+*.status
+.deps/
+autom4te.cache/
+autoscan.log
+config.h
+Makefile
+stamp*
