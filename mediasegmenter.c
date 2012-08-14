@@ -73,7 +73,7 @@ int  segmenter_write_pkt(SegmenterContext* context, AVFormatContext *source, AVP
 
 void segmenter_free_context(SegmenterContext* context);
 
-int  segmenter_write_index(SegmenterContext* context, char* index_file);
+int  segmenter_write_index(SegmenterContext* context, char* base_url, char* index_file);
 
 char *segmenter_format_error(int error);
 
@@ -412,7 +412,7 @@ void segmenter_free_context(SegmenterContext* context) {
  * @param index_file index file base name
  * @return 0 on success, negative error code on error 
  */
-int segmenter_write_index(SegmenterContext* context, char* index_file) {
+int segmenter_write_index(SegmenterContext* context, char* base_url, char* index_file) {
     int length;
     char *filename;
     
@@ -437,7 +437,7 @@ int segmenter_write_index(SegmenterContext* context, char* index_file) {
     int i;
     for (i=0; i <= context->segment_index; i++) {
         fprintf(out, "#EXTINF:%.1lf,\n"
-                     "%s%u.%s\n", context->durations[i], context->media_base_name, i, context->extension);
+                     "%s%s%u.%s\n", context->durations[i], base_url, context->media_base_name, i, context->extension);
     }
         
     fprintf(out, "#EXT-X-ENDLIST");
@@ -491,6 +491,9 @@ void print_usage(char* name) {
            , name);
 }
 
+
+#define DEFAULT_BASE_URL             ""
+#define DEFAULT_FILE_BASE            ""
 #define DEFAULT_BASE_MEDIA_FILE_NAME "fileSequence"
 #define DEFAULT_INDEX_FILE           "prog_index"
 
@@ -517,8 +520,8 @@ int main(int argc, char **argv) {
     int ret;
     int option_index = 0;
     
-    char *base_url             = NULL, 
-         *file_base            = NULL, 
+    char *base_url             = DEFAULT_BASE_URL, 
+         *file_base            = DEFAULT_FILE_BASE,
          *base_media_file_name = DEFAULT_BASE_MEDIA_FILE_NAME, 
          *index_file           = DEFAULT_INDEX_FILE,
          *log_file             = NULL,
@@ -630,7 +633,7 @@ int main(int argc, char **argv) {
     
     segmenter_close(output_context);
     
-    if ((ret = segmenter_write_index(output_context, index_file))) {
+    if ((ret = segmenter_write_index(output_context, base_url, index_file))) {
         log_failure("write index, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
