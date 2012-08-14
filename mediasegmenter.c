@@ -470,6 +470,26 @@ char *segmenter_format_error(int error) {
     return strndup(errstr, strlen(errstr));
 }
 
+void print_version() {
+    printf("%s: %s\n", PACKAGE, PACKAGE_VERSION);
+}
+
+void print_usage(char* name) {
+    printf("Usage:%s [options] <file> where options are:\n"
+           "\t" "-h        | --help                        : print this help message\n"
+           "\t" "-v        | --version                     : print version number\n"
+           "\t" "-b <url>  | --base-url=<url>              : base url (omit for relative URLs)\n"
+           "\t" "-t <dur>  | --target-duration=<dur>       : target duration for each segment\n"
+           "\t" "-f <path> | --file-base=<path>            : path at which to store index and media files\n"
+           "\t" "-i <name> | --index-file=<name>           : index file name (default prog_index)\n"
+           "\t" "-I        | --generate-variant-plist      : generate plist file for variantplaylistcreator\n"
+           "\t" "-B <name> | --base-media-file-name=<name> : base media file name (default fileSequence)\n"
+           "\t" "-l <path> | --log-file=<path>             : enable log file\n"
+           "\t" "-q        | --quiet                       : only output errors\n"
+           "\t" "-a        | --audio-only                  : only use audio from the stream\n"
+           "\t" "-A        | --video-only                  : only use video from the stream\n"
+           , name);
+}
 
 #define DEFAULT_BASE_MEDIA_FILE_NAME "fileSequence"
 #define DEFAULT_INDEX_FILE           "prog_index"
@@ -482,29 +502,17 @@ int main(int argc, char **argv) {
         {"base-url",                   required_argument, NULL, 'b'},
         {"target-duration",            required_argument, NULL, 't'},
         {"file-base",                  required_argument, NULL, 'f'},
-        {"meta-file",                  required_argument, NULL, 'F'},
-        {"meta-type",                  required_argument, NULL, 'y'},
-        {"meta-macro-file",            required_argument, NULL, 'M'},
         {"index-file",                 required_argument, NULL, 'i'},
         {"generate-variant-plist",     no_argument,       NULL, 'I'},
         {"base-media-file-name",       required_argument, NULL, 'B'},
-        {"encrypt-key-file",           required_argument, NULL, 'k'},
-        {"encrypt-key-url",            required_argument, NULL, 'K'},
-        {"encrypt-iv",                 required_argument, NULL, 'J'},
-        {"key-rotation-period",        required_argument, NULL, 'r'},
-        {"encrypt-rotate-iv-mbytes",   required_argument, NULL, 'm'},
-        {"base-encrypt-key-name",      required_argument, NULL, 'n'},
         {"log-file",                   required_argument, NULL, 'l'},
         {"quiet",                      no_argument,       NULL, 'q'},
         {"audio-only",                 no_argument,       NULL, 'a'},
         {"video-only",                 no_argument,       NULL, 'A'},
-        {"validate-files",             no_argument,       NULL, 'V'},
-        {"iframe-index-file",          required_argument, NULL, 'z'},
-        {"output-single-file",         no_argument,       NULL, 's'},
         {0, 0, 0, 0}
     };
     
-    char* options_short = "vhb:t:f:F:y:M:i:IB:k:K:J:r:m:n:l:qaAVzs";
+    char* options_short = "vhb:t:f:i:IB:l:qaAVzs";
     
     int ret;
     int option_index = 0;
@@ -525,8 +533,12 @@ int main(int argc, char **argv) {
         
         switch (c) {
             case 'v':
+                print_version();
+                exit(EXIT_SUCCESS);
                 break;
             case 'h':
+                print_usage(argv[0]);
+                exit(EXIT_SUCCESS);
                 break;
             case 'b':
                 base_url = optarg;
@@ -539,10 +551,6 @@ int main(int argc, char **argv) {
                 break;
             case 'i':
                 index_file = optarg;
-                break;
-            case 'M': case 'y': case 'F': case 'k': case 'K': case 'J': case 'r': case 'm': case 'n': case 'V': case 'z': case 's':
-                log_failure("--%s option not implemented", options_long[option_index].name);
-                exit(EXIT_FAILURE);
                 break;
             case 'I':
                 generate_variant_plist = 1;
