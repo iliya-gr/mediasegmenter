@@ -33,7 +33,13 @@ static const unsigned int kAvgSegmentsCount = 128;
 typedef enum {
     SegmenterStreamAudio = 0x01,
     SegmenterStreamVideo = 0x02
-} SegmenterStreamType;
+} SegmenterStreamFilter;
+
+typedef enum {
+    SegmenterTypeVOD,
+    SegmenterTypeLive,
+    SegmenterTypeEvent
+} SegmenterType;
 
 typedef struct {
     AVFormatContext          *output;
@@ -63,7 +69,7 @@ typedef struct {
 } SegmenterContext;
 
 int  segmenter_alloc_context(SegmenterContext** output, char* file_base_name, char* media_base_name, double target_duration);
-int  segmenter_init(SegmenterContext *context, AVFormatContext *source, SegmenterStreamType selector);
+int  segmenter_init(SegmenterContext *context, AVFormatContext *source, SegmenterStreamFilter selector);
 
 int  segmenter_open_output(SegmenterContext* context);
 int  segmenter_close(SegmenterContext* context);
@@ -132,7 +138,7 @@ int segmenter_alloc_context(SegmenterContext** output, char* file_base_name, cha
  * @param selector stream selector
  * @return 0 on success, negative error code on failure
  */
-int segmenter_init(SegmenterContext *context, AVFormatContext *source, SegmenterStreamType stream) {
+int segmenter_init(SegmenterContext *context, AVFormatContext *source, SegmenterStreamFilter stream) {
     int i;
     int video_index = -1, audio_index = -1;
     
@@ -316,6 +322,9 @@ int segmenter_close(SegmenterContext* context) {
         return ret;
     }
     
+    context->segment_index++;
+    context->segment_duration = 0;
+    
     return 0;
 }
 
@@ -406,42 +415,77 @@ void segmenter_free_context(SegmenterContext* context) {
     free(context);
 }
 
+FILE* segmenter_open_index(SegmenterContext *context, char *index_name) {
+    int length;
+    char *filename;
+    
+    length = snprintf(NULL, 0, "%s/%s.m3u8", context->file_base_name, index_name);
+    
+    if (!(filename = (char*)alloca(sizeof(char)*(length+1)))) {
+        return NULL;
+    }
+    
+    snprintf(filename, length + 1, "%s/%s.m3u8", context->file_base_name, index_name);
+    
+    return fopen(filename, "w+");
+}
+
+void segmenter_close_index(FILE *out) {
+    fclose(out);
+}
+
 /**
  * @brief write stream index
  * @param context segmenter context
  * @param index_file index file base name
  * @return 0 on success, negative error code on error 
  */
-int segmenter_write_index(SegmenterContext* context, char* base_url, char* index_file) {
-    int length;
-    char *filename;
-    
-    length = snprintf(NULL, 0, "%s/%s.m3u8", context->file_base_name, index_file);
-    
-    if (!(filename = (char*)alloca(sizeof(char)*(length+1)))) {
-        return SGERROR(SGERROR_MEM_ALLOC);
-    }
-        
-    snprintf(filename, length + 1, "%s/%s.m3u8", context->file_base_name, index_file);
-    
-    FILE *out = fopen(filename, "w+");
+int segmenter_write_index(SegmenterContext* context, char* base_url, char* index_file) {    
+    FILE *out = segmenter_open_index(context, index_file);
     
     if (!out) {
         return SGERROR(SGERROR_FILE_WRITE);
     }
+    
     fprintf(out, "#EXTM3U\n"
                  "#EXT-X-PLAYLIST-TYPE:VOD\n"
                  "#EXT-X-TARGETDURATION:%.0lf\n"
                  "#EXT-X-VERSION:3\n"
                  "#EXT-X-MEDIA-SEQUENCE:0\n", context->max_duration);
     int i;
-    for (i=0; i <= context->segment_index; i++) {
+    for (i=0; i < context->segment_index; i++) {
         fprintf(out, "#EXTINF:%.1lf,\n"
                      "%s%s%u.%s\n", context->durations[i], base_url, context->media_base_name, i, context->extension);
     }
         
     fprintf(out, "#EXT-X-ENDLIST");
-    fclose(out);
+    
+    segmenter_close_index(out);
+    
+    return 0;
+}
+
+int segmenter_write_live_index(SegmenterContext *context, unsigned int entries, char *base_url, char *index_file) {
+    unsigned int sequence = !entries ? 0 : context->segment_index > entries ? context->segment_index - entries : 0;
+    
+    FILE *out = segmenter_open_index(context, index_file);
+    
+    if (!out) {
+        return SGERROR(SGERROR_FILE_WRITE);
+    }
+    
+    fprintf(out, "#EXTM3U\n"
+                 "#EXT-X-TARGETDURATION:%.0lf\n"
+                 "#EXT-X-VERSION:3\n"
+                 "#EXT-X-MEDIA-SEQUENCE:%u\n", context->max_duration, sequence);
+
+    int i;
+    for (i = sequence; i < context->segment_index; i++) {
+        fprintf(out, "#EXTINF:%.1lf,\n"
+                     "%s%s%u.%s\n", context->durations[i], base_url, context->media_base_name, i, context->extension);
+    }
+    
+    segmenter_close_index(out);
     
     return 0;
 }
@@ -488,9 +532,26 @@ void print_usage(char* name) {
            "\t" "-q        | --quiet                       : only output errors\n"
            "\t" "-a        | --audio-only                  : only use audio from the stream\n"
            "\t" "-A        | --video-only                  : only use video from the stream\n"
+           "\t" "-s        | --live-stream                 : output live stream index file\n"
+           "\t" "-w <num>  | --sliding-window-entries      : maximum number of entries in index file"
+           "\t" "-D        | --delete-files                : delete files after they expire\n"
            , name);
 }
 
+struct config {
+    char *base_url;
+    char *file_base;
+    char *base_media_file_name;
+    char *index_file;
+    char *source_file;
+    
+    SegmenterStreamFilter filter;
+    SegmenterType         type;
+    
+    int entries;
+    
+    double target_duration;
+};
 
 #define DEFAULT_BASE_URL             ""
 #define DEFAULT_FILE_BASE            ""
@@ -512,23 +573,30 @@ int main(int argc, char **argv) {
         {"quiet",                      no_argument,       NULL, 'q'},
         {"audio-only",                 no_argument,       NULL, 'a'},
         {"video-only",                 no_argument,       NULL, 'A'},
+        {"live-stream",                no_argument,       NULL, 's'},
+        {"sliding-window-entries",     required_argument, NULL, 'w'},
         {0, 0, 0, 0}
     };
     
-    char* options_short = "vhb:t:f:i:IB:l:qaAVzs";
+    char* options_short = "vhb:t:f:i:IB:l:qaAVzsw:";
+    
+    struct config config;
+    
+    config.base_url             = DEFAULT_BASE_URL;
+    config.file_base            = DEFAULT_FILE_BASE;
+    config.base_media_file_name = DEFAULT_BASE_MEDIA_FILE_NAME;
+    config.index_file           = DEFAULT_INDEX_FILE;
+    config.source_file          = NULL;
+    
+    config.filter   = SegmenterStreamAudio | SegmenterStreamVideo;
+    config.type     = SegmenterTypeVOD;
+    config.entries  = 0;
+    
+    config.target_duration = 10;
     
     int ret;
     int option_index = 0;
     
-    char *base_url             = DEFAULT_BASE_URL, 
-         *file_base            = DEFAULT_FILE_BASE,
-         *base_media_file_name = DEFAULT_BASE_MEDIA_FILE_NAME, 
-         *index_file           = DEFAULT_INDEX_FILE,
-         *log_file             = NULL,
-         *source_file          = NULL;
-    
-    int    generate_variant_plist = 0, quiet = 0, audio_only = 0, video_only = 0;
-    double target_duration = 10;
     
     int c;
     do{
@@ -544,75 +612,65 @@ int main(int argc, char **argv) {
                 exit(EXIT_SUCCESS);
                 break;
             case 'b':
-                base_url = optarg;
+                config.base_url = optarg;
                 break;
             case 't': 
-                target_duration = atof(optarg);
+                config.target_duration = atof(optarg);
                 break;
             case 'f': 
-                file_base = optarg;
+                config.file_base = optarg;
                 break;
             case 'i':
-                index_file = optarg;
+                config.index_file = optarg;
                 break;
             case 'I':
-                generate_variant_plist = 1;
+//                config.generate_variant_plist = 1;
                 break;
-            case 'B':
-                base_media_file_name = optarg;
+            case 'B': config.base_media_file_name = optarg; break;
+//            case 'l': log_file    = optarg; break;
+//            case 'q': quiet       = 1;      break;
+            case 'a': config.filter = SegmenterStreamAudio; break;
+            case 'A': config.filter = SegmenterStreamVideo; break;
+            case 's': 
+                config.type    = SegmenterTypeLive; 
                 break;
-            case 'l':
-                log_file = optarg;
+            case 'w':
+                config.entries = atoi(optarg); 
                 break;
-            case 'q':
-                quiet = 1;
-                break;
-            case 'a':
-                audio_only = 1;
-                break;
-            case 'A': 
-                video_only = 1;
-                break;
+                
         }
     } while (c!= -1);
     
     if (optind < argc) {
-        source_file = argv[optind];
+        config.source_file = argv[optind];
     }
     
-    if (!source_file){
+    if (!config.source_file){
         log_failure("no source file was supplied");
         exit(EXIT_FAILURE);
     }
-    
-    if (!file_base) {
-        log_failure("no file base was supplied");
-        exit(EXIT_FAILURE);
-    }
-    
+        
     AVFormatContext  *source_context = NULL;
     SegmenterContext *output_context = NULL;
     
     av_register_all();
     
-    if(avformat_open_input(&source_context, source_file, NULL, NULL)) {
-        log_failure("can't open input file %s", source_file);
+    if(avformat_open_input(&source_context, config.source_file, NULL, NULL)) {
+        log_failure("can't open input file %s", config.source_file);
         exit(EXIT_FAILURE);
     }
     
     if (avformat_find_stream_info(source_context, NULL)) {
-        log(!quiet, "Warning: can't load input file info");
+        log(0, "Warning: can't load input file info");
     }
     
-    if ((ret = segmenter_alloc_context(&output_context, file_base, base_media_file_name, target_duration))) {
+    if ((ret = segmenter_alloc_context(&output_context, config.file_base, config.base_media_file_name, config.target_duration))) {
         log_failure("allocate context, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
     
-    SegmenterStreamType streams = audio_only ? SegmenterStreamAudio : 
-                                    (video_only ? SegmenterStreamVideo : SegmenterStreamVideo | SegmenterStreamAudio);
     
-    if ((ret = segmenter_init(output_context, source_context, streams))) {
+    if ((ret = segmenter_init(output_context, source_context, config.filter))) {
         log_failure("initialize context, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
@@ -623,17 +681,38 @@ int main(int argc, char **argv) {
     }
     
     AVPacket pkt;
+    unsigned int prev_index = 0;
     
     while (av_read_frame(source_context, &pkt) >= 0) {
+        
         if ((ret = segmenter_write_pkt(output_context, source_context, &pkt))) {
             log_failure("write packet, %s", segmenter_format_error(SGUNERROR(ret)));
             exit(EXIT_FAILURE);
+        }
+        
+        if (prev_index < output_context->segment_index) {
+            prev_index = output_context->segment_index;
+            
+            if (config.type == SegmenterTypeLive) {
+                segmenter_write_live_index(output_context, config.entries, config.base_url, config.index_file);
+            }
         }
     }
     
     segmenter_close(output_context);
     
-    if ((ret = segmenter_write_index(output_context, base_url, index_file))) {
+    switch (config.type) {
+        case SegmenterTypeVOD:
+            ret = segmenter_write_index(output_context, config.base_url, config.index_file);
+            break;
+        case SegmenterTypeLive:
+            ret = segmenter_write_live_index(output_context, config.entries, config.base_url, config.index_file);
+            break;
+        default:
+            break;
+    }
+    
+    if (ret) {
         log_failure("write index, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
