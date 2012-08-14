@@ -93,6 +93,8 @@ int segmenter_alloc_context(SegmenterContext** output, char* file_base_name, cha
         return SGERROR(SGERROR_MEM_ALLOC);
     }
     
+    context->output           = NULL;
+    
     context->file_base_name   = file_base_name;
     context->media_base_name  = media_base_name;
     
