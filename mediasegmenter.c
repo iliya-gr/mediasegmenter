@@ -540,7 +540,7 @@ void print_usage(char* name) {
            "\t" "-A        | --video-only                  : only use video from the stream\n"
            "\t" "-s        | --live                        : write live stream index file\n"
            "\t" "-e        | --live-event                  : write live event stream index file\n"
-           "\t" "-w <num>  | --sliding-window-entries      : maximum number of entries in index file"
+           "\t" "-w <num>  | --sliding-window-entries      : maximum number of entries in index file\n"
            "\t" "-D        | --delete-files                : delete files after they expire\n"
            , name);
 }
