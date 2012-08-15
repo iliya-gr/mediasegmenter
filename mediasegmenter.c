@@ -1,9 +1,12 @@
 #include "config.h"
 #include <stdio.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libavformat/avformat.h>
 #include <getopt.h>
+#include <libavformat/avformat.h>
+
 
 #define max(a,b)               (((a) > (b)) ? (a) : (b))
 #define log_failure(fmt, ...)  (fprintf(stderr, "Error: " fmt "\n", ##__VA_ARGS__))
@@ -31,15 +34,16 @@ static const unsigned int kAvgSegmentsCount = 128;
 #define SGERROR_FILE_WRITE         0x04
 
 typedef enum {
-    SegmenterStreamAudio = 0x01,
-    SegmenterStreamVideo = 0x02
-} SegmenterStreamFilter;
+    StreamAudio         = 0x01,
+    StreamVideo         = 0x02,
+    StreamAudioAndVideo = 0x03
+} StreamFilter;
 
 typedef enum {
-    SegmenterTypeVOD,
-    SegmenterTypeLive,
-    SegmenterTypeEvent
-} SegmenterType;
+    HLSTypeVOD,
+    HLSTypeLive,
+    HLSTypeEvent
+} HLSType;
 
 typedef struct {
     AVFormatContext          *output;
@@ -69,17 +73,16 @@ typedef struct {
 } SegmenterContext;
 
 int  segmenter_alloc_context(SegmenterContext** output, char* file_base_name, char* media_base_name, double target_duration);
-int  segmenter_init(SegmenterContext *context, AVFormatContext *source, SegmenterStreamFilter selector);
+int  segmenter_init(SegmenterContext *context, AVFormatContext *source, StreamFilter selector);
 
-int  segmenter_open_output(SegmenterContext* context);
+int  segmenter_open(SegmenterContext* context);
 int  segmenter_close(SegmenterContext* context);
-int  segmenter_next_segment(SegmenterContext* context);
 
 int  segmenter_write_pkt(SegmenterContext* context, AVFormatContext *source, AVPacket *pkt);
 
 void segmenter_free_context(SegmenterContext* context);
 
-int  segmenter_write_index(SegmenterContext* context, char* base_url, char* index_file);
+int segmenter_write_index(SegmenterContext *context, HLSType type, char* base_url, char *index_file, unsigned int max_entries, int final);
 
 char *segmenter_format_error(int error);
 
@@ -135,10 +138,10 @@ int segmenter_alloc_context(SegmenterContext** output, char* file_base_name, cha
  * @brief initialize segmenter with source context
  * @param context segmenter context
  * @param source input source context
- * @param selector stream selector
+ * @param filter stream filter
  * @return 0 on success, negative error code on failure
  */
-int segmenter_init(SegmenterContext *context, AVFormatContext *source, SegmenterStreamFilter stream) {
+int segmenter_init(SegmenterContext *context, AVFormatContext *source, StreamFilter filter) {
     int i;
     int video_index = -1, audio_index = -1;
     
@@ -148,7 +151,7 @@ int segmenter_init(SegmenterContext *context, AVFormatContext *source, Segmenter
         switch (_stream->codec->codec_type) {
             case AVMEDIA_TYPE_VIDEO:
 
-                if ((stream & SegmenterStreamVideo) && !load_decoder(_stream->codec)) {
+                if ((filter & StreamVideo) && !load_decoder(_stream->codec)) {
                     video_index = i;
                 } 
                 
@@ -156,7 +159,7 @@ int segmenter_init(SegmenterContext *context, AVFormatContext *source, Segmenter
                 
             case AVMEDIA_TYPE_AUDIO:
                 
-                if ((stream & SegmenterStreamAudio) && !load_decoder(_stream->codec)) {
+                if ((filter & StreamAudio) && !load_decoder(_stream->codec)) {
                     audio_index = i;
                 } 
                 
@@ -231,16 +234,8 @@ static int segmenter_store_segment_duration(SegmenterContext *context) {
     return 0;
 }
 
-/**
- * @brief saves changes to file and open next segment output
- * @param context segmenter context
- * @return 0 on success, negative error code on failure
- */
-int segmenter_next_segment(SegmenterContext* context) {
+int segmenter_finish_segment(SegmenterContext *context) {
     AVFormatContext *output = context->output;
-    
-    int    length;
-    char*  filename;
     size_t size;
     int    ret;
     
@@ -255,21 +250,36 @@ int segmenter_next_segment(SegmenterContext* context) {
         return ret;
     }
     
-    
     context->segment_index++;
     context->segment_duration = 0;
     
-    length = snprintf(NULL, 0, "%s/%s%u.%s", context->file_base_name, context->media_base_name, context->segment_index, context->extension);
+    return 0;
+}
 
+/**
+ * @brief starts next segment
+ * @param context segmenter context
+ * @return 0 on success, negative error code on failure
+ */
+int segmenter_start_segment(SegmenterContext *context) { 
+    char *filename;
+    int   length;
+    
+    length = snprintf(NULL, 0, "%s/%s%u.%s", context->file_base_name, context->media_base_name, context->segment_index, context->extension);
+    
     if (!(filename = (char*)alloca(sizeof(char) * (length + 1)))) {
         return SGERROR(SGERROR_MEM_ALLOC);
     }
     
     snprintf(filename, length + 1, "%s/%s%u.%s", context->file_base_name, context->media_base_name, context->segment_index, context->extension);
-
-
+    
+    
     if (avio_open(&context->output->pb, filename, AVIO_FLAG_WRITE)) {
         return SGERROR(SGERROR_FILE_WRITE);
+    }
+    
+    if (context->segment_index == 0) {
+        avformat_write_header(context->output, NULL);
     }
     
     return 0;
@@ -280,25 +290,8 @@ int segmenter_next_segment(SegmenterContext* context) {
  * @param context segmenter context
  * @return 0 on success, negative error code on failure
  */
-int segmenter_open_output(SegmenterContext* context) {
-    int   length;
-    char *filename;
-    
-    length = snprintf(NULL, 0, "%s/%s%u.%s", context->file_base_name, context->media_base_name, context->segment_index, context->extension);
-    
-    if (!(filename = (char*)alloca(sizeof(char) * (length + 1)))) {
-        return SGERROR(SGERROR_MEM_ALLOC);
-    }
-    
-    snprintf(filename, length + 1, "%s/%s%u.%s", context->file_base_name, context->media_base_name, context->segment_index, context->extension);
-    
-    if (avio_open(&context->output->pb, filename, AVIO_FLAG_WRITE)) {
-        return SGERROR(SGERROR_FILE_WRITE);
-    }
-    
-    avformat_write_header(context->output, NULL);
-    
-    return 0;
+int segmenter_open(SegmenterContext* context) {
+    return segmenter_start_segment(context);
 }
 
 /**
@@ -307,23 +300,31 @@ int segmenter_open_output(SegmenterContext* context) {
  * @return 0 on success, negative error code on failure
  */
 int segmenter_close(SegmenterContext* context) {
-    AVFormatContext *output = context->output;
-    size_t size;
-    int    ret;
+    return segmenter_finish_segment(context);
+}
+
+/**
+ * @brief delete segmenets from 0 to to_index
+ * @param context segmenter context
+ * @param to_index upper limit of segment index
+ * @return 0 on success, negative error code on failure
+ */
+int segmenter_delete_segments(SegmenterContext *context, unsigned int to_index) {
+    int   length;
+    char* filename;
     
-    avio_flush(output->pb);
-    size = avio_size(output->pb);
-    avio_close(output->pb);
+    length = snprintf(NULL, 0, "%s/%s%u.%s", context->file_base_name, context->media_base_name, UINT_MAX, context->extension);
     
-    context->max_bitrate = max(context->max_bitrate, size * 8 / context->segment_duration);
-    context->avg_bitrate = (context->avg_bitrate * context->segment_index + (size * 8 / context->segment_duration)) / (context->segment_index + 1);
-    
-    if ((ret = segmenter_store_segment_duration(context))) {
-        return ret;
+    if (!(filename = (char*)alloca(sizeof(char) * (length + 1)))) {
+        return SGERROR(SGERROR_MEM_ALLOC);
     }
     
-    context->segment_index++;
-    context->segment_duration = 0;
+    unsigned int i;
+    
+    for (i = 0; i < to_index; i++) {
+        snprintf(filename, length, "%s/%s%u.%s", context->file_base_name, context->media_base_name, i, context->extension);
+        unlink(filename);
+    }
     
     return 0;
 }
@@ -390,7 +391,11 @@ int segmenter_write_pkt(SegmenterContext* context, AVFormatContext *source, AVPa
         
         context->_pts = opkt.pts;
         
-        if((ret = segmenter_next_segment(context))){
+        if((ret = segmenter_finish_segment(context))) {
+            return ret;
+        }
+        
+        if ((ret = segmenter_start_segment(context))) {
             return ret;
         }
     }
@@ -415,17 +420,17 @@ void segmenter_free_context(SegmenterContext* context) {
     free(context);
 }
 
-FILE* segmenter_open_index(SegmenterContext *context, char *index_name) {
+FILE* segmenter_open_index(SegmenterContext *context, char *index_file) {
     int length;
     char *filename;
     
-    length = snprintf(NULL, 0, "%s/%s.m3u8", context->file_base_name, index_name);
+    length = snprintf(NULL, 0, "%s/%s", context->file_base_name, index_file);
     
     if (!(filename = (char*)alloca(sizeof(char)*(length+1)))) {
         return NULL;
     }
     
-    snprintf(filename, length + 1, "%s/%s.m3u8", context->file_base_name, index_name);
+    snprintf(filename, length + 1, "%s/%s", context->file_base_name, index_file);
     
     return fopen(filename, "w+");
 }
@@ -440,55 +445,56 @@ void segmenter_close_index(FILE *out) {
  * @param index_file index file base name
  * @return 0 on success, negative error code on error 
  */
-int segmenter_write_index(SegmenterContext* context, char* base_url, char* index_file) {    
-    FILE *out = segmenter_open_index(context, index_file);
+int segmenter_write_index(SegmenterContext *context, HLSType type, char* base_url, char *index_file, unsigned int max_entries, int final) {
     
-    if (!out) {
-        return SGERROR(SGERROR_FILE_WRITE);
+    if (type == HLSTypeVOD && !final) {
+        return 0;
     }
-    
-    fprintf(out, "#EXTM3U\n"
-                 "#EXT-X-PLAYLIST-TYPE:VOD\n"
-                 "#EXT-X-TARGETDURATION:%.0lf\n"
-                 "#EXT-X-VERSION:3\n"
-                 "#EXT-X-MEDIA-SEQUENCE:0\n", context->max_duration);
-    int i;
-    for (i=0; i < context->segment_index; i++) {
-        fprintf(out, "#EXTINF:%.1lf,\n"
-                     "%s%s%u.%s\n", context->durations[i], base_url, context->media_base_name, i, context->extension);
-    }
-        
-    fprintf(out, "#EXT-X-ENDLIST");
-    
-    segmenter_close_index(out);
-    
-    return 0;
-}
 
-int segmenter_write_live_index(SegmenterContext *context, unsigned int entries, char *base_url, char *index_file) {
-    unsigned int sequence = !entries ? 0 : context->segment_index > entries ? context->segment_index - entries : 0;
-    
     FILE *out = segmenter_open_index(context, index_file);
     
     if (!out) {
         return SGERROR(SGERROR_FILE_WRITE);
+    }
+    
+    unsigned int sequence = 0;
+    
+    if (type == HLSTypeLive && max_entries != 0) {
+        sequence = context->segment_index > max_entries ? context->segment_index - max_entries : 0;
     }
     
     fprintf(out, "#EXTM3U\n"
                  "#EXT-X-TARGETDURATION:%.0lf\n"
                  "#EXT-X-VERSION:3\n"
                  "#EXT-X-MEDIA-SEQUENCE:%u\n", context->max_duration, sequence);
-
-    int i;
-    for (i = sequence; i < context->segment_index; i++) {
-        fprintf(out, "#EXTINF:%.1lf,\n"
-                     "%s%s%u.%s\n", context->durations[i], base_url, context->media_base_name, i, context->extension);
+    
+    switch (type) {
+        case HLSTypeVOD:
+            fprintf(out, "#EXT-X-PLAYLIST-TYPE:VOD\n");
+            break;
+        case HLSTypeEvent:
+            fprintf(out, "#EXT-X-PLAYLIST-TYPE:EVENT\n");
+            break;
+        default:
+            break;
+    }
+    
+    if (!final || type != HLSTypeLive) {
+        int i;
+        for (i = sequence; i < context->segment_index; i++) {
+            fprintf(out, "#EXTINF:%.1lf,\n"
+                    "%s%s%u.%s\n", context->durations[i], base_url, context->media_base_name, i, context->extension);
+        }
+    }
+    
+    if ((type == HLSTypeEvent || type == HLSTypeVOD) && final) {
+        fprintf(out, "#EXT-X-ENDLIST");
     }
     
     segmenter_close_index(out);
-    
     return 0;
 }
+
 
 char *segmenter_format_error(int error) {
     char* errstr = NULL;
@@ -525,14 +531,15 @@ void print_usage(char* name) {
            "\t" "-b <url>  | --base-url=<url>              : base url (omit for relative URLs)\n"
            "\t" "-t <dur>  | --target-duration=<dur>       : target duration for each segment\n"
            "\t" "-f <path> | --file-base=<path>            : path at which to store index and media files\n"
-           "\t" "-i <name> | --index-file=<name>           : index file name (default prog_index)\n"
+           "\t" "-i <name> | --index-file=<name>           : index file name (default prog_index.m3u8)\n"
            "\t" "-I        | --generate-variant-plist      : generate plist file for variantplaylistcreator\n"
            "\t" "-B <name> | --base-media-file-name=<name> : base media file name (default fileSequence)\n"
            "\t" "-l <path> | --log-file=<path>             : enable log file\n"
            "\t" "-q        | --quiet                       : only output errors\n"
            "\t" "-a        | --audio-only                  : only use audio from the stream\n"
            "\t" "-A        | --video-only                  : only use video from the stream\n"
-           "\t" "-s        | --live-stream                 : output live stream index file\n"
+           "\t" "-s        | --live                        : write live stream index file\n"
+           "\t" "-e        | --live-event                  : write live event stream index file\n"
            "\t" "-w <num>  | --sliding-window-entries      : maximum number of entries in index file"
            "\t" "-D        | --delete-files                : delete files after they expire\n"
            , name);
@@ -545,18 +552,20 @@ struct config {
     char *index_file;
     char *source_file;
     
-    SegmenterStreamFilter filter;
-    SegmenterType         type;
+    StreamFilter    filter;
+    HLSType         type;
     
-    int entries;
+    int max_index_entries;
+    int delete;
     
     double target_duration;
+    
 };
 
 #define DEFAULT_BASE_URL             ""
 #define DEFAULT_FILE_BASE            ""
 #define DEFAULT_BASE_MEDIA_FILE_NAME "fileSequence"
-#define DEFAULT_INDEX_FILE           "prog_index"
+#define DEFAULT_INDEX_FILE           "prog_index.m3u8"
 
 int main(int argc, char **argv) {
     
@@ -573,12 +582,14 @@ int main(int argc, char **argv) {
         {"quiet",                      no_argument,       NULL, 'q'},
         {"audio-only",                 no_argument,       NULL, 'a'},
         {"video-only",                 no_argument,       NULL, 'A'},
-        {"live-stream",                no_argument,       NULL, 's'},
+        {"live",                       no_argument,       NULL, 's'},
+        {"live-event",                 no_argument,       NULL, 'e'},
         {"sliding-window-entries",     required_argument, NULL, 'w'},
+        {"delete-files",               no_argument,       NULL, 'D'},
         {0, 0, 0, 0}
     };
     
-    char* options_short = "vhb:t:f:i:IB:l:qaAVzsw:";
+    char* options_short = "vhb:t:f:i:IB:l:qaAVzsew:D";
     
     struct config config;
     
@@ -588,9 +599,11 @@ int main(int argc, char **argv) {
     config.index_file           = DEFAULT_INDEX_FILE;
     config.source_file          = NULL;
     
-    config.filter   = SegmenterStreamAudio | SegmenterStreamVideo;
-    config.type     = SegmenterTypeVOD;
-    config.entries  = 0;
+    config.filter   = StreamAudio | StreamVideo;
+    config.type     = HLSTypeVOD;
+    
+    config.max_index_entries  = 0;
+    config.delete             = 0;
     
     config.target_duration = 10;
     
@@ -629,14 +642,13 @@ int main(int argc, char **argv) {
             case 'B': config.base_media_file_name = optarg; break;
 //            case 'l': log_file    = optarg; break;
 //            case 'q': quiet       = 1;      break;
-            case 'a': config.filter = SegmenterStreamAudio; break;
-            case 'A': config.filter = SegmenterStreamVideo; break;
-            case 's': 
-                config.type    = SegmenterTypeLive; 
-                break;
-            case 'w':
-                config.entries = atoi(optarg); 
-                break;
+            case 'a': config.filter = StreamAudio; break;
+            case 'A': config.filter = StreamVideo; break;
+                
+            case 's': config.type    = HLSTypeLive;   break;
+            case 'e': config.type    = HLSTypeEvent;  break;
+            case 'w': config.max_index_entries = atoi(optarg); break;
+            case 'D': config.delete  = 1; break;
                 
         }
     } while (c!= -1);
@@ -675,7 +687,7 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
     
-    if((ret =segmenter_open_output(output_context))){
+    if((ret = segmenter_open(output_context))){
         log_failure("open output, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
@@ -693,28 +705,23 @@ int main(int argc, char **argv) {
         if (prev_index < output_context->segment_index) {
             prev_index = output_context->segment_index;
             
-            if (config.type == SegmenterTypeLive) {
-                segmenter_write_live_index(output_context, config.entries, config.base_url, config.index_file);
+            segmenter_write_index(output_context, config.type, config.base_url, config.index_file, config.max_index_entries, 0);
+                       
+            if (config.delete && config.max_index_entries && config.type == HLSTypeLive && output_context->segment_index > config.max_index_entries) {
+                segmenter_delete_segments(output_context, output_context->segment_index - config.max_index_entries);
             }
         }
     }
     
     segmenter_close(output_context);
     
-    switch (config.type) {
-        case SegmenterTypeVOD:
-            ret = segmenter_write_index(output_context, config.base_url, config.index_file);
-            break;
-        case SegmenterTypeLive:
-            ret = segmenter_write_live_index(output_context, config.entries, config.base_url, config.index_file);
-            break;
-        default:
-            break;
-    }
-    
-    if (ret) {
+    if ((ret = segmenter_write_index(output_context, config.type, config.base_url, config.index_file, config.max_index_entries, 1))) {
         log_failure("write index, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
+    }
+    
+    if (config.delete && config.type == HLSTypeLive) {
+        segmenter_delete_segments(output_context, output_context->segment_index);
     }
     
     segmenter_free_context(output_context);
