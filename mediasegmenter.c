@@ -610,6 +610,7 @@ int main(int argc, char **argv) {
     int ret;
     int option_index = 0;
     
+    opterr = 0;
     
     int c;
     do{
@@ -649,7 +650,11 @@ int main(int argc, char **argv) {
             case 'e': config.type    = HLSTypeEvent;  break;
             case 'w': config.max_index_entries = atoi(optarg); break;
             case 'D': config.delete  = 1; break;
-                
+            
+            case '?':
+                fprintf(stderr ,"%s: invalid option '%s'\n", argv[0], argv[optind - 1]);
+                exit(EXIT_FAILURE);
+                break;
         }
     } while (c!= -1);
     
