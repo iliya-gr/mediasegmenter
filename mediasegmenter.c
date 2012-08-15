@@ -589,7 +589,7 @@ int main(int argc, char **argv) {
         {0, 0, 0, 0}
     };
     
-    char* options_short = "vhb:t:f:i:IB:l:qaAVzsew:D";
+    char* options_short = "vhb:t:f:i:IB:l:qaAsew:D";
     
     struct config config;
     
