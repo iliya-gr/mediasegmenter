@@ -12,7 +12,7 @@ PKG_CHECK_MODULES([AVUTIL],   [libavutil   >= 51.54.100], [], [AC_MSG_ERROR([lib
 PKG_CHECK_MODULES([AVCODEC],  [libavcodec  >= 54.23.100], [], [AC_MSG_ERROR([libavcodec version 54.23.100 or later required])])
 
 # Checks for header files.
-AC_CHECK_HEADERS([stdlib.h string.h getopt.h])
+AC_CHECK_HEADERS([stdlib.h limits.h stdint.h string.h getopt.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_INT64_T
