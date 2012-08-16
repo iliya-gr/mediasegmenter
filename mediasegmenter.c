@@ -19,7 +19,7 @@
 #include <getopt.h>
 #include <libavformat/avformat.h>
 #include "segmenter.h"
-#include "util.h"
+#include "utils.h"
 
 #define max(a,b)               (((a) > (b)) ? (a) : (b))
 #define log_failure(fmt, ...)  (fprintf(stderr, "Error: " fmt "\n", ##__VA_ARGS__))

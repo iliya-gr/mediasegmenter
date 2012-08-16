@@ -16,7 +16,7 @@
 
 #include "config.h"
 #include "segmenter.h"
-#include "util.h"
+#include "utils.h"
 
 #include <math.h>
 #include <stdio.h>
