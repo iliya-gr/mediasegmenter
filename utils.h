@@ -15,8 +15,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#ifndef __SG_UTIL__
-#define __SG_UTIL__
+#ifndef __SG_UTILS__
+#define __SG_UTILS__
 
 #define SGERROR(e)         (-(e))
 #define SGUNERROR(e)       (-(e))
