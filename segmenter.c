@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <openssl/aes.h>
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
@@ -27,9 +28,6 @@ static const char* kFormatMP3       = "mp3";
 static const char* kFormatMPEGTS    = "mpegts";
 
 static const unsigned int kAvgSegmentsCount = 128;
-
-static AVStream*       copy_stream(AVFormatContext *target_context, AVStream *source_stream);
-static int             load_decoder(AVCodecContext *context);
 
 static AVStream* copy_stream(AVFormatContext *context, AVStream *source_stream) {
     AVStream *output_stream = avformat_new_stream(context, source_stream->codec->codec);
@@ -102,52 +100,64 @@ static int load_decoder(AVCodecContext *context) {
 /**
  * @brief allocate segmenter context and set default values
  * @param output segmenter context
- * @param file_base_name segment file path base name e.g. /tmp/
- * @param media_base_name segment file base name e.g. segment-
- * @param target_duration segment target duration 
  * @return 0 on success, negative error code on failure
  */
-int segmenter_alloc_context(SegmenterContext** output) {
+int segmenter_alloc_context(SegmenterContext** context) {
     
-    SegmenterContext *context = (SegmenterContext*)malloc(sizeof(SegmenterContext));
+    SegmenterContext *_context = (SegmenterContext*)malloc(sizeof(SegmenterContext));
     
-    if (!context) {
+    if (!_context) {
         return SGERROR(SGERROR_MEM_ALLOC);
     }
     
-    context->output           = NULL;
+    _context->output           = NULL;
     
-    context->file_base_name   = NULL;
-    context->media_base_name  = NULL;
+    _context->file_base_name   = NULL;
+    _context->media_base_name  = NULL;
     
-    context->segment_start_index = 0;
-    context->segment_index       = 0;
-    context->segment_duration    = 0;
+    _context->segment_file_sequence = 0;
+    _context->segment_sequence      = 0;
+    _context->segment_index         = 0;
+    _context->segment_duration      = 0;
     
-    context->duration            = 0;
+    _context->duration         = 0;
     
-    context->target_duration     = 0;
-    context->max_duration        = 0;
+    _context->target_duration  = 0;
+    _context->max_duration     = 0;
     
-    context->max_bitrate         = 0;
-    context->avg_bitrate         = 0;
+    _context->max_bitrate      = 0;
+    _context->avg_bitrate      = 0;
     
-    context->_pts                = 0;
-    context->_dts                = 0;
+    _context->_pts             = 0;
+    _context->_dts             = 0;
      
-    context->durations_length = kAvgSegmentsCount;
-    context->durations        = (double*)malloc(sizeof(double) * context->durations_length);
+    _context->eof              = 0;
     
-    if (!context->durations) {
-        free(context);
+    _context->durations_length = kAvgSegmentsCount;
+    _context->durations        = (double*)malloc(sizeof(double) * _context->durations_length);
+    
+    if (!_context->durations) {
+        free(_context);
         return SGERROR(SGERROR_MEM_ALLOC);
     }
     
-    context->bfilter = av_bitstream_filter_init("h264_mp4toannexb");
+    _context->bfilter = av_bitstream_filter_init("h264_mp4toannexb");
     
-    *output = context;
+    *context = _context;
     
     return 0;
+}
+
+/**
+ * @brief free segmenter context
+ * @param context segmenter context
+ */
+void segmenter_free_context(SegmenterContext* context) {
+    av_bitstream_filter_close(context->bfilter);
+    avformat_free_context(context->output);
+    
+    free(context->durations);
+    free(context);
 }
 
 /**
@@ -233,9 +243,9 @@ int segmenter_init(SegmenterContext *context, AVFormatContext *source, char* fil
     return 0;
 }
 
-static int segmenter_store_segment_duration(SegmenterContext *context) {
+static int set_segment_duration(SegmenterContext *context, unsigned int index, double duration) {
     
-    if (context->segment_index - context->segment_start_index >= context->durations_length) {
+    if (index - context->segment_sequence >= context->durations_length) {
         context->durations_length += kAvgSegmentsCount;
         context->durations = (double*)realloc(context->durations, context->durations_length * sizeof(double));
         
@@ -244,44 +254,23 @@ static int segmenter_store_segment_duration(SegmenterContext *context) {
         }
     }
     
-    context->durations[context->segment_index - context->segment_start_index] = context->segment_duration;
-    context->max_duration = max(context->max_duration, context->segment_duration);
+    context->durations[index - context->segment_sequence] = duration;
+    context->max_duration = max(context->max_duration, duration);
     
     return 0;
 }
 
-static double segmenter_segment_duration(SegmenterContext *context, unsigned int segment) {
-    return context->durations[segment - context->segment_start_index];
+static inline double segment_duration(SegmenterContext *context, unsigned int segment) {
+    return context->durations[segment - context->segment_sequence];
 }
 
-int segmenter_finish_segment(SegmenterContext *context) {
-    AVFormatContext *output = context->output;
-    size_t size;
-    int    ret;
-    
-    avio_flush(output->pb);
-    size = avio_size(output->pb);
-    avio_close(output->pb);
-    
-    context->max_bitrate = max(context->max_bitrate, size * 8 / context->segment_duration);
-    context->avg_bitrate = (context->avg_bitrate * context->segment_index + (size * 8 / context->segment_duration)) / (context->segment_index + 1);
-    
-    if ((ret = segmenter_store_segment_duration(context))) {
-        return ret;
-    }
-    
-    context->segment_index++;
-    context->segment_duration = 0;
-    
-    return 0;
-}
 
 /**
  * @brief starts next segment
  * @param context segmenter context
  * @return 0 on success, negative error code on failure
  */
-int segmenter_start_segment(SegmenterContext *context) { 
+static int start_segment(SegmenterContext *context) { 
     char *filename;
     int   length;
     
@@ -306,12 +295,39 @@ int segmenter_start_segment(SegmenterContext *context) {
 }
 
 /**
+ * @brief finish segment
+ * @param context segmenter context
+ * @return 0 on success, negative error code on failure
+ */
+static int finish_segment(SegmenterContext *context) {
+    AVFormatContext *output = context->output;
+    size_t size;
+    int    ret;
+    
+    avio_flush(output->pb);
+    size = avio_size(output->pb);
+    avio_close(output->pb);
+    
+    context->max_bitrate = max(context->max_bitrate, size * 8 / context->segment_duration);
+    context->avg_bitrate = (context->avg_bitrate * context->segment_index + (size * 8 / context->segment_duration)) / (context->segment_index + 1);
+    
+    if ((ret = set_segment_duration(context, context->segment_index, context->segment_duration))) {
+        return ret;
+    }
+    
+    context->segment_index++;
+    context->segment_duration = 0;
+    
+    return 0;
+}
+
+/**
  * @brief open first output segment
  * @param context segmenter context
  * @return 0 on success, negative error code on failure
  */
 int segmenter_open(SegmenterContext* context) {
-    return segmenter_start_segment(context);
+    return start_segment(context);
 }
 
 /**
@@ -320,16 +336,17 @@ int segmenter_open(SegmenterContext* context) {
  * @return 0 on success, negative error code on failure
  */
 int segmenter_close(SegmenterContext* context) {
-    return segmenter_finish_segment(context);
+    context->eof = 1;
+    
+    return finish_segment(context);
 }
 
 /**
- * @brief delete segmenets from 0 to to_index
+ * @brief delete segmenets out from current sequence
  * @param context segmenter context
- * @param to_index upper limit of segment index
  * @return 0 on success, negative error code on failure
  */
-int segmenter_delete_segments(SegmenterContext *context, unsigned int to_index) {
+static int clear_segments(SegmenterContext *context) {
     int   length;
     char* filename;
     
@@ -341,19 +358,55 @@ int segmenter_delete_segments(SegmenterContext *context, unsigned int to_index) 
     
     unsigned int i;
     
-    for (i = context->segment_start_index; i < to_index; i++) {
+    for (i = context->segment_file_sequence; i < context->segment_sequence; i++) {
         snprintf(filename, length, "%s/%s%u.%s", context->file_base_name, context->media_base_name, i, context->extension);
         unlink(filename);
     }
     
-    context->max_duration = 0;
+    context->segment_file_sequence = context->segment_sequence;
+        
+    return 0;
+}
+
+/**
+ * @brief set segmenter sequence index
+ * @param context segmenter context
+ * @param sequence new sequence value
+ * @param del whether to delete out sequence segments from disk
+ */
+int segmenter_set_sequence(SegmenterContext *context, unsigned int sequence, int del) {
+    double duration = 0;
     
-    for (i=context->segment_start_index; i<context->segment_index; i++) {
-        context->durations[i - context->segment_start_index] = context->durations[i - context->segment_start_index + to_index];
-        context->max_duration = max(context->max_duration, context->durations[i - context->segment_start_index]);
+    int i;
+    
+    if (sequence <= context->segment_sequence || sequence >= context->segment_index) {
+        return 0;
     }
     
-    context->segment_start_index = to_index;
+    for (i=sequence; i < context->segment_index; i++) {
+        duration += segment_duration(context, i);
+    }
+    
+    i = sequence;
+    
+    while (duration < context->target_duration * 3 && i > context->segment_sequence) {
+        duration += segment_duration(context, --i);
+    }
+        
+    sequence = i;
+    
+    context->max_duration = 0;
+    
+    for (i = sequence; i < context->segment_index; i++) {
+        context->durations[i - sequence] = context->durations[i - context->segment_sequence];
+        context->max_duration = max(context->max_duration, context->durations[i - sequence]);
+    }
+    
+    context->segment_sequence = sequence;
+    
+    if (del) {
+        clear_segments(context);
+    }
     
     return 0;
 }
@@ -422,11 +475,11 @@ int segmenter_write_pkt(SegmenterContext* context, AVFormatContext *source, AVPa
         
         context->_pts = opkt.pts;
         
-        if((ret = segmenter_finish_segment(context))) {
+        if((ret = finish_segment(context))) {
             return ret;
         }
         
-        if ((ret = segmenter_start_segment(context))) {
+        if ((ret = start_segment(context))) {
             return ret;
         }
     }
@@ -439,19 +492,7 @@ int segmenter_write_pkt(SegmenterContext* context, AVFormatContext *source, AVPa
 }
 
 
-/**
- * @brief free segmenter context
- * @param context segmenter context
- */
-void segmenter_free_context(SegmenterContext* context) {
-    av_bitstream_filter_close(context->bfilter);
-    avformat_free_context(context->output);
-    
-    free(context->durations);
-    free(context);
-}
-
-FILE* segmenter_open_index(SegmenterContext *context, char *index_file) {
+static FILE* segmenter_open_playlist(SegmenterContext *context, char *index_file) {
     int length;
     char *filename;
     
@@ -463,10 +504,10 @@ FILE* segmenter_open_index(SegmenterContext *context, char *index_file) {
     
     snprintf(filename, length + 1, "%s/%s", context->file_base_name, index_file);
     
-    return fopen(filename, "w+");
+    return fopen(filename, "w");
 }
 
-void segmenter_close_index(FILE *out) {
+static void segmenter_close_playlist(FILE *out) {
     fclose(out);
 }
 
@@ -476,28 +517,22 @@ void segmenter_close_index(FILE *out) {
  * @param index_file index file base name
  * @return 0 on success, negative error code on error 
  */
-int segmenter_write_index(SegmenterContext *context, IndexType type, char* base_url, char *index_file, unsigned int max_entries, int final) {
+int segmenter_write_playlist(SegmenterContext *context, IndexType type, char* base_url, char *index_file) {
     
-    if (type == IndexTypeVOD && !final) {
+    if (type == IndexTypeVOD && !context->eof) {
         return 0;
     }
     
-    FILE *out = segmenter_open_index(context, index_file);
+    FILE *out = segmenter_open_playlist(context, index_file);
     
     if (!out) {
         return SGERROR(SGERROR_FILE_WRITE);
     }
-    
-    unsigned int sequence = 0;
-    
-    if (type == IndexTypeLive && max_entries != 0) {
-        sequence = context->segment_index > max_entries ? context->segment_index - max_entries : 0;
-    }
-    
+        
     fprintf(out, "#EXTM3U\n"
                  "#EXT-X-TARGETDURATION:%ld\n"
                  "#EXT-X-VERSION:3\n"
-                 "#EXT-X-MEDIA-SEQUENCE:%u\n", lround(context->max_duration), sequence);
+                 "#EXT-X-MEDIA-SEQUENCE:%u\n", lround(context->max_duration), context->segment_sequence);
     
     switch (type) {
         case IndexTypeVOD:
@@ -510,18 +545,17 @@ int segmenter_write_index(SegmenterContext *context, IndexType type, char* base_
             break;
     }
     
-    if (!final || type != IndexTypeLive) {
-        int i;
-        for (i = sequence; i < context->segment_index; i++) {
-            fprintf(out, "#EXTINF:%ld,\n"
-                         "%s%s%u.%s\n", lround(segmenter_segment_duration(context, i)), base_url, context->media_base_name, i, context->extension);
-        }
+    int i;
+    for (i = context->segment_sequence; i < context->segment_index; i++) {
+        fprintf(out, "#EXTINF:%ld,\n"
+                     "%s%s%u.%s\n", lround(segment_duration(context, i)), base_url, context->media_base_name, i, context->extension);
     }
     
-    if ((type == IndexTypeEvent || type == IndexTypeVOD) && final) {
+    if ((type == IndexTypeEvent || type == IndexTypeVOD) && context->eof) {
         fprintf(out, "#EXT-X-ENDLIST");
     }
     
-    segmenter_close_index(out);
+    segmenter_close_playlist(out);
+    
     return 0;
 }

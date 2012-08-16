@@ -56,7 +56,7 @@ void print_usage(char* name) {
            "\t" "-q        | --quiet                       : only output errors\n"
            "\t" "-a        | --audio-only                  : only use audio from the stream\n"
            "\t" "-A        | --video-only                  : only use video from the stream\n"
-           "\t" "-s        | --live                        : write live stream index file\n"
+           "\t" "-l        | --live                        : write live stream index file\n"
            "\t" "-e        | --live-event                  : write live event stream index file\n"
            "\t" "-w <num>  | --sliding-window-entries      : maximum number of entries in index file\n"
            "\t" "-D        | --delete-files                : delete files after they expire\n"
@@ -96,18 +96,17 @@ int main(int argc, char **argv) {
         {"index-file",                 required_argument, NULL, 'i'},
         {"generate-variant-plist",     no_argument,       NULL, 'I'},
         {"base-media-file-name",       required_argument, NULL, 'B'},
-        {"log-file",                   required_argument, NULL, 'l'},
         {"quiet",                      no_argument,       NULL, 'q'},
         {"audio-only",                 no_argument,       NULL, 'a'},
         {"video-only",                 no_argument,       NULL, 'A'},
-        {"live",                       no_argument,       NULL, 's'},
+        {"live",                       no_argument,       NULL, 'l'},
         {"live-event",                 no_argument,       NULL, 'e'},
         {"sliding-window-entries",     required_argument, NULL, 'w'},
         {"delete-files",               no_argument,       NULL, 'D'},
         {0, 0, 0, 0}
     };
     
-    char* options_short = "vhb:t:f:i:IB:l:qaAsew:D";
+    char* options_short = "vhb:t:f:i:IB:qaAlew:D";
     
     struct config config;
     
@@ -159,7 +158,6 @@ int main(int argc, char **argv) {
 //                config.generate_variant_plist = 1;
                 break;
             case 'B': config.base_media_file_name = optarg; break;
-//            case 'l': log_file    = optarg; break;
 //            case 'q': quiet       = 1;      break;
             case 'a': config.media = MediaTypeAudio; break;
             case 'A': config.media = MediaTypeVideo; break;

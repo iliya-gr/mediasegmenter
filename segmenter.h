@@ -32,8 +32,8 @@ typedef struct {
     AVStream        *video, *audio;
     int             source_video_index, source_audio_index;
     
-    unsigned int    segment_start_index;
-    
+    unsigned int    segment_file_sequence;
+    unsigned int    segment_sequence;
     unsigned int    segment_index;
     double          segment_duration;
     
@@ -50,11 +50,13 @@ typedef struct {
     int64_t         _pts;
     int64_t         _dts;
     
+    int             eof;
+    
 } SegmenterContext;
 
 int  segmenter_alloc_context(SegmenterContext** output);
 int  segmenter_init(SegmenterContext *context, AVFormatContext *source, char* file_base_name, char* media_base_name, 
-                    double target_duration, int media_filter);
+                        double target_duration, int media_filter);
 
 int  segmenter_open(SegmenterContext* context);
 int  segmenter_close(SegmenterContext* context);
@@ -63,8 +65,8 @@ int  segmenter_write_pkt(SegmenterContext* context, AVFormatContext *source, AVP
 
 void segmenter_free_context(SegmenterContext* context);
 
-int segmenter_write_index(SegmenterContext *context, IndexType type, char* base_url, char *index_file, unsigned int max_entries, int final);
+int segmenter_set_sequence(SegmenterContext *context, unsigned int sequence, int del);
+int segmenter_write_playlist(SegmenterContext *context, IndexType type, char* base_url, char *index_file);
 
-int segmenter_delete_segments(SegmenterContext *context, unsigned int to_index);
 
 #endif
