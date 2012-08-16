@@ -20,10 +20,9 @@
 #include <libavformat/avformat.h>
 #include "segmenter.h"
 #include "utils.h"
+#include "log.h"
 
 #define max(a,b)               (((a) > (b)) ? (a) : (b))
-#define log_failure(fmt, ...)  (fprintf(stderr, "Error: " fmt "\n", ##__VA_ARGS__))
-#define log(verbose, fmt, ...) ((verbose) && fprintf(stdout, fmt "\n", ##__VA_ARGS__))
 
 
 char *segmenter_format_error(int error) {
@@ -99,6 +98,8 @@ struct config {
 
 int main(int argc, char **argv) {
     
+    sg_log_init(argv[0]);
+    
     struct option options_long[] = {
         {"version",                    no_argument,       NULL, 'v'},
         {"help",                       no_argument,       NULL, 'h'},
@@ -170,11 +171,11 @@ int main(int argc, char **argv) {
 //                config.generate_variant_plist = 1;
                 break;
             case 'B': config.base_media_file_name = optarg; break;
-//            case 'q': quiet       = 1;      break;
-            case 'a': config.media = MediaTypeAudio; break;
-            case 'A': config.media = MediaTypeVideo; break;
+            case 'q': sg_log_set_level(SG_LOG_FATAL); break;
+            case 'a': config.media = MediaTypeAudio;  break;
+            case 'A': config.media = MediaTypeVideo;  break;
                 
-            case 's': config.type    = IndexTypeLive;   break;
+            case 'l': config.type    = IndexTypeLive;   break;
             case 'e': config.type    = IndexTypeEvent;  break;
             case 'w': config.max_index_entries = atoi(optarg); break;
             case 'D': config.delete  = 1; break;
@@ -191,7 +192,7 @@ int main(int argc, char **argv) {
     }
     
     if (!config.source_file){
-        log_failure("no source file was supplied");
+        sg_log(SG_LOG_FATAL, "no source file was supplied");
         exit(EXIT_FAILURE);
     }
         
@@ -201,27 +202,27 @@ int main(int argc, char **argv) {
     av_register_all();
     
     if(avformat_open_input(&source_context, config.source_file, NULL, NULL)) {
-        log_failure("can't open input file %s", config.source_file);
+        sg_log(SG_LOG_FATAL, "can't open input file '%s'", config.source_file);
         exit(EXIT_FAILURE);
     }
     
     if (avformat_find_stream_info(source_context, NULL)) {
-        log(0, "Warning: can't load input file info");
+        sg_log(SG_LOG_WARNING, "Warning: can't load input file info");
     }
     
     if ((ret = segmenter_alloc_context(&output_context))) {
-        log_failure("allocate context, %s", segmenter_format_error(SGUNERROR(ret)));
+        sg_log(SG_LOG_FATAL, "allocate context, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
     
     
     if ((ret = segmenter_init(output_context, source_context, config.file_base, config.base_media_file_name, config.target_duration, config.media))) {
-        log_failure("initialize context, %s", segmenter_format_error(SGUNERROR(ret)));
+        sg_log(SG_LOG_FATAL, "initialize context, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
     
     if((ret = segmenter_open(output_context))){
-        log_failure("open output, %s", segmenter_format_error(SGUNERROR(ret)));
+        sg_log(SG_LOG_FATAL, "open output, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
     
@@ -231,7 +232,7 @@ int main(int argc, char **argv) {
     while (av_read_frame(source_context, &pkt) >= 0) {
         
         if ((ret = segmenter_write_pkt(output_context, source_context, &pkt))) {
-            log_failure("write packet, %s", segmenter_format_error(SGUNERROR(ret)));
+            sg_log(SG_LOG_FATAL, "write packet, %s", segmenter_format_error(SGUNERROR(ret)));
             exit(EXIT_FAILURE);
         }
         
@@ -249,7 +250,7 @@ int main(int argc, char **argv) {
     segmenter_close(output_context);
     
     if ((ret = segmenter_write_playlist(output_context, config.type, config.base_url, config.index_file))) {
-        log_failure("write index, %s", segmenter_format_error(SGUNERROR(ret)));
+        sg_log(SG_LOG_FATAL, "write index, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
     
