@@ -226,23 +226,19 @@ int main(int argc, char **argv) {
         if (prev_index < output_context->segment_index) {
             prev_index = output_context->segment_index;
             
-            segmenter_write_index(output_context, config.type, config.base_url, config.index_file, config.max_index_entries, 0);
-                       
-            if (config.delete && config.max_index_entries && config.type == IndexTypeLive && output_context->segment_index > config.max_index_entries) {
-                segmenter_delete_segments(output_context, output_context->segment_index - config.max_index_entries);
+            if (config.max_index_entries && config.type == IndexTypeLive) {
+                segmenter_set_sequence(output_context, output_context->segment_index - config.max_index_entries, config.delete);
             }
+            
+            segmenter_write_playlist(output_context, config.type, config.base_url, config.index_file);
         }
     }
     
     segmenter_close(output_context);
     
-    if ((ret = segmenter_write_index(output_context, config.type, config.base_url, config.index_file, config.max_index_entries, 1))) {
+    if ((ret = segmenter_write_playlist(output_context, config.type, config.base_url, config.index_file))) {
         log_failure("write index, %s", segmenter_format_error(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
-    }
-    
-    if (config.delete && config.type == IndexTypeLive) {
-        segmenter_delete_segments(output_context, output_context->segment_index);
     }
     
     segmenter_free_context(output_context);
