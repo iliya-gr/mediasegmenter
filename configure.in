@@ -1,5 +1,5 @@
 AC_PREREQ([2.63])
-AC_INIT(mediasegmenter, 0.0.1, iliya.gr@gmail.com, mediasegmenter, https://github.com/iliya-gr/mediasegmenter)
+AC_INIT(mediasegmenter, 0.1.0, iliya.gr@gmail.com, mediasegmenter, https://github.com/iliya-gr/mediasegmenter)
 AC_CONFIG_SRCDIR([mediasegmenter.c])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([1.11 foreign])
