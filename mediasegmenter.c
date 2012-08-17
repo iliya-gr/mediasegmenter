@@ -55,7 +55,7 @@ void print_usage(char* name) {
 struct config {
     char *base_url;
     char *file_base;
-    char *base_media_file_name;
+    char *media_file_name;
     char *index_file;
     char *source_file;
     
@@ -66,8 +66,7 @@ struct config {
     int playlist_entries;
     int delete;
     
-    double target_duration;
-    
+    double duration;
 };
 
 int main(int argc, char **argv) {
@@ -99,7 +98,7 @@ int main(int argc, char **argv) {
     
     config.base_url             = DEFAULT_BASE_URL;
     config.file_base            = DEFAULT_FILE_BASE;
-    config.base_media_file_name = DEFAULT_BASE_MEDIA_FILE_NAME;
+    config.media_file_name = DEFAULT_BASE_MEDIA_FILE_NAME;
     config.index_file           = DEFAULT_INDEX_FILE;
     config.source_file          = NULL;
     
@@ -109,7 +108,7 @@ int main(int argc, char **argv) {
     config.playlist_entries = 0;
     config.delete           = 0;
     
-    config.target_duration = 10;
+    config.duration = 10;
     
     int ret;
     int option_index = 0;
@@ -125,11 +124,11 @@ int main(int argc, char **argv) {
             case 'h': print_usage(argv[0]); exit(EXIT_SUCCESS); break;
                 
             case 'b': config.base_url        = optarg;       break;
-            case 't': config.target_duration = atof(optarg); break;
+            case 't': config.duration        = atof(optarg); break;
             case 'f': config.file_base       = optarg;       break;
             case 'i': config.index_file      = optarg;       break;
             case 'I': config.stat            = 1;            break;
-            case 'B': config.base_media_file_name = optarg;  break;
+            case 'B': config.media_file_name = optarg;       break;
                 
             case 'q': sg_log_set_level(SG_LOG_FATAL);           break;
             case 'a': config.media            = MediaTypeAudio; break;
@@ -175,7 +174,7 @@ int main(int argc, char **argv) {
     }
     
     
-    if ((ret = segmenter_init(output_context, source_context, config.file_base, config.base_media_file_name, config.target_duration, config.media))) {
+    if ((ret = segmenter_init(output_context, source_context, config.file_base, config.media_file_name, config.duration, config.media))) {
         sg_log(SG_LOG_FATAL, "initialize context, %s", sg_strerror(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
