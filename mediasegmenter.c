@@ -19,35 +19,13 @@
 #include <getopt.h>
 #include <libavformat/avformat.h>
 #include "segmenter.h"
-#include "utils.h"
+#include "util.h"
 #include "log.h"
 
-#define max(a,b)               (((a) > (b)) ? (a) : (b))
-
-
-char *segmenter_format_error(int error) {
-    char* errstr = NULL;
-    
-    switch (error) {
-        case SGERROR_MEM_ALLOC:
-            errstr = "can't allocate memory";
-            break;
-        case SGERROR_FILE_WRITE:
-            errstr = "can't open file for writing";
-            break;
-        case SGERROR_NO_STREAM:
-            errstr = "no suitable streams found";
-            break;
-        case SGERROR_UNSUPPORTED_FORMAT:
-            errstr = "unsupported output format";
-            break;
-        default:
-            errstr = "unkown error";
-            break;
-    }
-    
-    return strndup(errstr, strlen(errstr));
-}
+#define DEFAULT_BASE_URL             ""
+#define DEFAULT_FILE_BASE            ""
+#define DEFAULT_BASE_MEDIA_FILE_NAME "fileSequence"
+#define DEFAULT_INDEX_FILE           "prog_index.m3u8"
 
 void print_version() {
     printf("%s: %s\n", PACKAGE, PACKAGE_VERSION);
@@ -84,17 +62,13 @@ struct config {
     int          media;
     IndexType    type;
     
-    int max_index_entries;
+    int stat;
+    int playlist_entries;
     int delete;
     
     double target_duration;
     
 };
-
-#define DEFAULT_BASE_URL             ""
-#define DEFAULT_FILE_BASE            ""
-#define DEFAULT_BASE_MEDIA_FILE_NAME "fileSequence"
-#define DEFAULT_INDEX_FILE           "prog_index.m3u8"
 
 int main(int argc, char **argv) {
     
@@ -129,11 +103,11 @@ int main(int argc, char **argv) {
     config.index_file           = DEFAULT_INDEX_FILE;
     config.source_file          = NULL;
     
-    config.media   = MediaTypeAudio | MediaTypeVideo;
-    config.type    = IndexTypeVOD;
+    config.media = MediaTypeAudio | MediaTypeVideo;
+    config.type  = IndexTypeVOD;
     
-    config.max_index_entries  = 0;
-    config.delete             = 0;
+    config.playlist_entries = 0;
+    config.delete           = 0;
     
     config.target_duration = 10;
     
@@ -147,38 +121,23 @@ int main(int argc, char **argv) {
         c = getopt_long(argc, argv, options_short, options_long, &option_index);
         
         switch (c) {
-            case 'v':
-                print_version();
-                exit(EXIT_SUCCESS);
-                break;
-            case 'h':
-                print_usage(argv[0]);
-                exit(EXIT_SUCCESS);
-                break;
-            case 'b':
-                config.base_url = optarg;
-                break;
-            case 't': 
-                config.target_duration = atof(optarg);
-                break;
-            case 'f': 
-                config.file_base = optarg;
-                break;
-            case 'i':
-                config.index_file = optarg;
-                break;
-            case 'I':
-//                config.generate_variant_plist = 1;
-                break;
-            case 'B': config.base_media_file_name = optarg; break;
-            case 'q': sg_log_set_level(SG_LOG_FATAL); break;
-            case 'a': config.media = MediaTypeAudio;  break;
-            case 'A': config.media = MediaTypeVideo;  break;
+            case 'v': print_version();      exit(EXIT_SUCCESS); break;
+            case 'h': print_usage(argv[0]); exit(EXIT_SUCCESS); break;
                 
-            case 'l': config.type    = IndexTypeLive;   break;
-            case 'e': config.type    = IndexTypeEvent;  break;
-            case 'w': config.max_index_entries = atoi(optarg); break;
-            case 'D': config.delete  = 1; break;
+            case 'b': config.base_url        = optarg;       break;
+            case 't': config.target_duration = atof(optarg); break;
+            case 'f': config.file_base       = optarg;       break;
+            case 'i': config.index_file      = optarg;       break;
+            case 'I': config.stat            = 1;            break;
+            case 'B': config.base_media_file_name = optarg;  break;
+                
+            case 'q': sg_log_set_level(SG_LOG_FATAL);           break;
+            case 'a': config.media            = MediaTypeAudio; break;
+            case 'A': config.media            = MediaTypeVideo; break;
+            case 'l': config.type             = IndexTypeLive;  break;
+            case 'e': config.type             = IndexTypeEvent; break;
+            case 'w': config.playlist_entries = atoi(optarg);   break;
+            case 'D': config.delete           = 1;              break;
             
             case '?':
                 fprintf(stderr ,"%s: invalid option '%s'\n", argv[0], argv[optind - 1]);
@@ -211,18 +170,18 @@ int main(int argc, char **argv) {
     }
     
     if ((ret = segmenter_alloc_context(&output_context))) {
-        sg_log(SG_LOG_FATAL, "allocate context, %s", segmenter_format_error(SGUNERROR(ret)));
+        sg_log(SG_LOG_FATAL, "allocate context, %s", sg_strerror(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
     
     
     if ((ret = segmenter_init(output_context, source_context, config.file_base, config.base_media_file_name, config.target_duration, config.media))) {
-        sg_log(SG_LOG_FATAL, "initialize context, %s", segmenter_format_error(SGUNERROR(ret)));
+        sg_log(SG_LOG_FATAL, "initialize context, %s", sg_strerror(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
     
     if((ret = segmenter_open(output_context))){
-        sg_log(SG_LOG_FATAL, "open output, %s", segmenter_format_error(SGUNERROR(ret)));
+        sg_log(SG_LOG_FATAL, "open output, %s", sg_strerror(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
     
@@ -232,15 +191,15 @@ int main(int argc, char **argv) {
     while (av_read_frame(source_context, &pkt) >= 0) {
         
         if ((ret = segmenter_write_pkt(output_context, source_context, &pkt))) {
-            sg_log(SG_LOG_FATAL, "write packet, %s", segmenter_format_error(SGUNERROR(ret)));
+            sg_log(SG_LOG_FATAL, "write packet, %s", sg_strerror(SGUNERROR(ret)));
             exit(EXIT_FAILURE);
         }
         
         if (prev_index < output_context->segment_index) {
             prev_index = output_context->segment_index;
             
-            if (config.max_index_entries && config.type == IndexTypeLive) {
-                segmenter_set_sequence(output_context, output_context->segment_index - config.max_index_entries, config.delete);
+            if (config.playlist_entries && config.type == IndexTypeLive) {
+                segmenter_set_sequence(output_context, output_context->segment_index - config.playlist_entries, config.delete);
             }
             
             segmenter_write_playlist(output_context, config.type, config.base_url, config.index_file);
@@ -250,7 +209,7 @@ int main(int argc, char **argv) {
     segmenter_close(output_context);
     
     if ((ret = segmenter_write_playlist(output_context, config.type, config.base_url, config.index_file))) {
-        sg_log(SG_LOG_FATAL, "write index, %s", segmenter_format_error(SGUNERROR(ret)));
+        sg_log(SG_LOG_FATAL, "write index, %s", sg_strerror(SGUNERROR(ret)));
         exit(EXIT_FAILURE);
     }
     
