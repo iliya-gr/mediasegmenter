@@ -16,7 +16,7 @@
 
 #include "config.h"
 #include "segmenter.h"
-#include "utils.h"
+#include "util.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -36,7 +36,7 @@ static const char* kFormatADTS      = "adts";
 static const char* kFormatMP3       = "mp3";
 static const char* kFormatMPEGTS    = "mpegts";
 
-static const unsigned int kAvgSegmentsCount = 128;
+static const size_t kAvgSegmentsCount = 128;
 
 static AVStream* copy_stream(AVFormatContext *context, AVStream *source_stream) {
     AVStream *output_stream = avformat_new_stream(context, source_stream->codec->codec);
@@ -121,6 +121,9 @@ int segmenter_alloc_context(SegmenterContext** context) {
     
     _context->output           = NULL;
     
+    _context->buf              = NULL;
+    _context->buf_size         = 0;
+    
     _context->file_base_name   = NULL;
     _context->media_base_name  = NULL;
     
@@ -142,8 +145,8 @@ int segmenter_alloc_context(SegmenterContext** context) {
      
     _context->eof              = 0;
     
-    _context->durations_length = kAvgSegmentsCount;
-    _context->durations        = (double*)malloc(sizeof(double) * _context->durations_length);
+    _context->durations_size   = kAvgSegmentsCount;
+    _context->durations        = (double*)malloc(sizeof(double) * _context->durations_size);
     
     if (!_context->durations) {
         free(_context);
@@ -162,10 +165,23 @@ int segmenter_alloc_context(SegmenterContext** context) {
  * @param context segmenter context
  */
 void segmenter_free_context(SegmenterContext* context) {
-    av_bitstream_filter_close(context->bfilter);
-    avformat_free_context(context->output);
     
-    free(context->durations);
+    if (context->bfilter) {
+        av_bitstream_filter_close(context->bfilter);
+    }
+    
+    if (context->output) {
+        avformat_free_context(context->output);
+    }
+    
+    if (context->buf) {
+        free(context->buf);
+    }
+    
+    if (context->durations) {
+        free(context->durations);
+    }
+    
     free(context);
 }
 
@@ -249,14 +265,20 @@ int segmenter_init(SegmenterContext *context, AVFormatContext *source, char* fil
     context->media_base_name = media_base_name;
     context->target_duration = target_duration;
     
+    context->buf_size = snprintf(NULL, 0, "%s/%s%u.%s", context->file_base_name, context->media_base_name, UINT_MAX, context->extension) + 1;
+    
+    if (!(context->buf = (char*)malloc(context->buf_size * sizeof(char)))) {
+        return SGERROR(SGERROR_MEM_ALLOC);
+    }
+    
     return 0;
 }
 
 static int set_segment_duration(SegmenterContext *context, unsigned int index, double duration) {
     
-    if (index - context->segment_sequence >= context->durations_length) {
-        context->durations_length += kAvgSegmentsCount;
-        context->durations = (double*)realloc(context->durations, context->durations_length * sizeof(double));
+    if (index - context->segment_sequence >= context->durations_size) {
+        context->durations_size += kAvgSegmentsCount;
+        context->durations = (double*)realloc(context->durations, context->durations_size * sizeof(double));
         
         if (!context->durations) {
             return SGERROR(SGERROR_MEM_ALLOC);
@@ -279,20 +301,11 @@ static inline double segment_duration(SegmenterContext *context, unsigned int se
  * @param context segmenter context
  * @return 0 on success, negative error code on failure
  */
-static int start_segment(SegmenterContext *context) { 
-    char *filename;
-    int   length;
+static int start_segment(SegmenterContext *context) {
     
-    length = snprintf(NULL, 0, "%s/%s%u.%s", context->file_base_name, context->media_base_name, context->segment_index, context->extension);
+    snprintf(context->buf, context->buf_size, "%s/%s%u.%s", context->file_base_name, context->media_base_name, context->segment_index, context->extension);
     
-    if (!(filename = (char*)alloca(sizeof(char) * (length + 1)))) {
-        return SGERROR(SGERROR_MEM_ALLOC);
-    }
-    
-    snprintf(filename, length + 1, "%s/%s%u.%s", context->file_base_name, context->media_base_name, context->segment_index, context->extension);
-    
-    
-    if (avio_open(&context->output->pb, filename, AVIO_FLAG_WRITE)) {
+    if (avio_open(&context->output->pb, context->buf, AVIO_FLAG_WRITE)) {
         return SGERROR(SGERROR_FILE_WRITE);
     }
     
@@ -356,20 +369,12 @@ int segmenter_close(SegmenterContext* context) {
  * @return 0 on success, negative error code on failure
  */
 static int clear_segments(SegmenterContext *context) {
-    int   length;
-    char* filename;
-    
-    length = snprintf(NULL, 0, "%s/%s%u.%s", context->file_base_name, context->media_base_name, UINT_MAX, context->extension);
-    
-    if (!(filename = (char*)alloca(sizeof(char) * (length + 1)))) {
-        return SGERROR(SGERROR_MEM_ALLOC);
-    }
     
     unsigned int i;
     
     for (i = context->segment_file_sequence; i < context->segment_sequence; i++) {
-        snprintf(filename, length, "%s/%s%u.%s", context->file_base_name, context->media_base_name, i, context->extension);
-        unlink(filename);
+        snprintf(context->buf, context->buf_size, "%s/%s%u.%s", context->file_base_name, context->media_base_name, i, context->extension);
+        unlink(context->buf);
     }
     
     context->segment_file_sequence = context->segment_sequence;
