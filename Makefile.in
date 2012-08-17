@@ -67,7 +67,7 @@ am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_mediasegmenter_OBJECTS = mediasegmenter-mediasegmenter.$(OBJEXT) \
 	mediasegmenter-segmenter.$(OBJEXT) \
-	mediasegmenter-log.$(OBJEXT)
+	mediasegmenter-log.$(OBJEXT) mediasegmenter-util.$(OBJEXT)
 mediasegmenter_OBJECTS = $(am_mediasegmenter_OBJECTS)
 am__DEPENDENCIES_1 =
 mediasegmenter_DEPENDENCIES = $(am__DEPENDENCIES_1) \
@@ -208,7 +208,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 mediasegmenter_CFLAGS = $(AVFORMAT_CFLAGS) $(AVUTIL_CFLAGS) $(AVCODEC_CFLAGS)
 mediasegmenter_LDADD = $(AVFORMAT_LIBS) $(AVUTIL_LIBS) $(AVCODEC_LIBS)
-mediasegmenter_SOURCES = mediasegmenter.c segmenter.c log.c
+mediasegmenter_SOURCES = mediasegmenter.c segmenter.c log.c util.c
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -316,6 +316,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mediasegmenter-log.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mediasegmenter-mediasegmenter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mediasegmenter-segmenter.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mediasegmenter-util.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -372,6 +373,20 @@ mediasegmenter-log.obj: log.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='log.c' object='mediasegmenter-log.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mediasegmenter_CFLAGS) $(CFLAGS) -c -o mediasegmenter-log.obj `if test -f 'log.c'; then $(CYGPATH_W) 'log.c'; else $(CYGPATH_W) '$(srcdir)/log.c'; fi`
+
+mediasegmenter-util.o: util.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mediasegmenter_CFLAGS) $(CFLAGS) -MT mediasegmenter-util.o -MD -MP -MF $(DEPDIR)/mediasegmenter-util.Tpo -c -o mediasegmenter-util.o `test -f 'util.c' || echo '$(srcdir)/'`util.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/mediasegmenter-util.Tpo $(DEPDIR)/mediasegmenter-util.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='util.c' object='mediasegmenter-util.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mediasegmenter_CFLAGS) $(CFLAGS) -c -o mediasegmenter-util.o `test -f 'util.c' || echo '$(srcdir)/'`util.c
+
+mediasegmenter-util.obj: util.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mediasegmenter_CFLAGS) $(CFLAGS) -MT mediasegmenter-util.obj -MD -MP -MF $(DEPDIR)/mediasegmenter-util.Tpo -c -o mediasegmenter-util.obj `if test -f 'util.c'; then $(CYGPATH_W) 'util.c'; else $(CYGPATH_W) '$(srcdir)/util.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/mediasegmenter-util.Tpo $(DEPDIR)/mediasegmenter-util.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='util.c' object='mediasegmenter-util.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mediasegmenter_CFLAGS) $(CFLAGS) -c -o mediasegmenter-util.obj `if test -f 'util.c'; then $(CYGPATH_W) 'util.c'; else $(CYGPATH_W) '$(srcdir)/util.c'; fi`
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
