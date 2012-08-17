@@ -14,16 +14,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#include <stdlib.h>
+#include <string.h>
+#include "util.h"
 
-#ifndef __SG_UTILS__
-#define __SG_UTILS__
-
-#define SGERROR(e)         (-(e))
-#define SGUNERROR(e)       (-(e))
-
-#define SGERROR_MEM_ALLOC          0x01
-#define SGERROR_NO_STREAM          0x02
-#define SGERROR_UNSUPPORTED_FORMAT 0x03
-#define SGERROR_FILE_WRITE         0x04
-
-#endif
+char *sg_strerror(int error) {
+    char* errstr = NULL;
+    
+    switch (error) {
+        case SGERROR_MEM_ALLOC:
+            errstr = "can't allocate memory";
+            break;
+        case SGERROR_FILE_WRITE:
+            errstr = "can't open file for writing";
+            break;
+        case SGERROR_NO_STREAM:
+            errstr = "no suitable streams found";
+            break;
+        case SGERROR_UNSUPPORTED_FORMAT:
+            errstr = "unsupported output format";
+            break;
+        default:
+            errstr = "unkown error";
+            break;
+    }
+    
+    return strndup(errstr, strlen(errstr));
+}
