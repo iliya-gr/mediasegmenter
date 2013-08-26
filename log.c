@@ -16,6 +16,7 @@
 
 #include "log.h"
 #include <stdio.h>
+#include <stdarg.h>
 
 static char* sg_log_app   = NULL;
 static int   sg_log_level = SG_LOG_INFO;
