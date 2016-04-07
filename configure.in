@@ -7,9 +7,9 @@ AM_INIT_AUTOMAKE([1.11 foreign])
 # Checks for programs.
 AC_PROG_CC
 
-PKG_CHECK_MODULES([AVFORMAT], [libavformat >= 54.6.100],  [], [AC_MSG_ERROR([libavformat version 54.6.100 or later required])])
-PKG_CHECK_MODULES([AVUTIL],   [libavutil   >= 51.54.100], [], [AC_MSG_ERROR([libavutil version 51.54.100 or later required])])
-PKG_CHECK_MODULES([AVCODEC],  [libavcodec  >= 54.23.100], [], [AC_MSG_ERROR([libavcodec version 54.23.100 or later required])])
+PKG_CHECK_MODULES([AVFORMAT], [libavformat >= 57.28.102],  [], [AC_MSG_ERROR([libavformat version 57.28.102 or later required])])
+PKG_CHECK_MODULES([AVUTIL],   [libavutil   >= 55.19.100], [], [AC_MSG_ERROR([libavutil version 55.19.100 or later required])])
+PKG_CHECK_MODULES([AVCODEC],  [libavcodec  >= 57.28.103], [], [AC_MSG_ERROR([libavcodec version 57.28.103 or later required])])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h limits.h stdint.h string.h getopt.h])

@@ -3936,12 +3936,12 @@ if test -n "$AVFORMAT_CFLAGS"; then
     pkg_cv_AVFORMAT_CFLAGS="$AVFORMAT_CFLAGS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavformat >= 54.6.100\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "libavformat >= 54.6.100") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavformat >= 57.28.102\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libavformat >= 57.28.102") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_AVFORMAT_CFLAGS=`$PKG_CONFIG --cflags "libavformat >= 54.6.100" 2>/dev/null`
+  pkg_cv_AVFORMAT_CFLAGS=`$PKG_CONFIG --cflags "libavformat >= 57.28.102" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -3953,12 +3953,12 @@ if test -n "$AVFORMAT_LIBS"; then
     pkg_cv_AVFORMAT_LIBS="$AVFORMAT_LIBS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavformat >= 54.6.100\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "libavformat >= 54.6.100") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavformat >= 57.28.102\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libavformat >= 57.28.102") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_AVFORMAT_LIBS=`$PKG_CONFIG --libs "libavformat >= 54.6.100" 2>/dev/null`
+  pkg_cv_AVFORMAT_LIBS=`$PKG_CONFIG --libs "libavformat >= 57.28.102" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -3979,18 +3979,18 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-	        AVFORMAT_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libavformat >= 54.6.100" 2>&1`
+	        AVFORMAT_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libavformat >= 57.28.102" 2>&1`
         else
-	        AVFORMAT_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libavformat >= 54.6.100" 2>&1`
+	        AVFORMAT_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libavformat >= 57.28.102" 2>&1`
         fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$AVFORMAT_PKG_ERRORS" >&5
 
-	as_fn_error $? "libavformat version 54.6.100 or later required" "$LINENO" 5
+	as_fn_error $? "libavformat version 57.28.102 or later required" "$LINENO" 5
 elif test $pkg_failed = untried; then
      	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-	as_fn_error $? "libavformat version 54.6.100 or later required" "$LINENO" 5
+	as_fn_error $? "libavformat version 57.28.102 or later required" "$LINENO" 5
 else
 	AVFORMAT_CFLAGS=$pkg_cv_AVFORMAT_CFLAGS
 	AVFORMAT_LIBS=$pkg_cv_AVFORMAT_LIBS
@@ -4007,12 +4007,12 @@ if test -n "$AVUTIL_CFLAGS"; then
     pkg_cv_AVUTIL_CFLAGS="$AVUTIL_CFLAGS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavutil   >= 51.54.100\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "libavutil   >= 51.54.100") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavutil   >= 55.19.100\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libavutil   >= 55.19.100") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_AVUTIL_CFLAGS=`$PKG_CONFIG --cflags "libavutil   >= 51.54.100" 2>/dev/null`
+  pkg_cv_AVUTIL_CFLAGS=`$PKG_CONFIG --cflags "libavutil   >= 55.19.100" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -4024,12 +4024,12 @@ if test -n "$AVUTIL_LIBS"; then
     pkg_cv_AVUTIL_LIBS="$AVUTIL_LIBS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavutil   >= 51.54.100\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "libavutil   >= 51.54.100") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavutil   >= 55.19.100\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libavutil   >= 55.19.100") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_AVUTIL_LIBS=`$PKG_CONFIG --libs "libavutil   >= 51.54.100" 2>/dev/null`
+  pkg_cv_AVUTIL_LIBS=`$PKG_CONFIG --libs "libavutil   >= 55.19.100" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -4050,18 +4050,18 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-	        AVUTIL_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libavutil   >= 51.54.100" 2>&1`
+	        AVUTIL_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libavutil   >= 55.19.100" 2>&1`
         else
-	        AVUTIL_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libavutil   >= 51.54.100" 2>&1`
+	        AVUTIL_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libavutil   >= 55.19.100" 2>&1`
         fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$AVUTIL_PKG_ERRORS" >&5
 
-	as_fn_error $? "libavutil version 51.54.100 or later required" "$LINENO" 5
+	as_fn_error $? "libavutil version 55.19.100 or later required" "$LINENO" 5
 elif test $pkg_failed = untried; then
      	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-	as_fn_error $? "libavutil version 51.54.100 or later required" "$LINENO" 5
+	as_fn_error $? "libavutil version 55.19.100 or later required" "$LINENO" 5
 else
 	AVUTIL_CFLAGS=$pkg_cv_AVUTIL_CFLAGS
 	AVUTIL_LIBS=$pkg_cv_AVUTIL_LIBS
@@ -4078,12 +4078,12 @@ if test -n "$AVCODEC_CFLAGS"; then
     pkg_cv_AVCODEC_CFLAGS="$AVCODEC_CFLAGS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavcodec  >= 54.23.100\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "libavcodec  >= 54.23.100") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavcodec  >= 57.28.103\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libavcodec  >= 57.28.103") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_AVCODEC_CFLAGS=`$PKG_CONFIG --cflags "libavcodec  >= 54.23.100" 2>/dev/null`
+  pkg_cv_AVCODEC_CFLAGS=`$PKG_CONFIG --cflags "libavcodec  >= 57.28.103" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -4095,12 +4095,12 @@ if test -n "$AVCODEC_LIBS"; then
     pkg_cv_AVCODEC_LIBS="$AVCODEC_LIBS"
  elif test -n "$PKG_CONFIG"; then
     if test -n "$PKG_CONFIG" && \
-    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavcodec  >= 54.23.100\""; } >&5
-  ($PKG_CONFIG --exists --print-errors "libavcodec  >= 54.23.100") 2>&5
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"libavcodec  >= 57.28.103\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "libavcodec  >= 57.28.103") 2>&5
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_AVCODEC_LIBS=`$PKG_CONFIG --libs "libavcodec  >= 54.23.100" 2>/dev/null`
+  pkg_cv_AVCODEC_LIBS=`$PKG_CONFIG --libs "libavcodec  >= 57.28.103" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
@@ -4121,18 +4121,18 @@ else
         _pkg_short_errors_supported=no
 fi
         if test $_pkg_short_errors_supported = yes; then
-	        AVCODEC_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libavcodec  >= 54.23.100" 2>&1`
+	        AVCODEC_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libavcodec  >= 57.28.103" 2>&1`
         else
-	        AVCODEC_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libavcodec  >= 54.23.100" 2>&1`
+	        AVCODEC_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libavcodec  >= 57.28.103" 2>&1`
         fi
 	# Put the nasty error message in config.log where it belongs
 	echo "$AVCODEC_PKG_ERRORS" >&5
 
-	as_fn_error $? "libavcodec version 54.23.100 or later required" "$LINENO" 5
+	as_fn_error $? "libavcodec version 57.28.103 or later required" "$LINENO" 5
 elif test $pkg_failed = untried; then
      	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-	as_fn_error $? "libavcodec version 54.23.100 or later required" "$LINENO" 5
+	as_fn_error $? "libavcodec version 57.28.103 or later required" "$LINENO" 5
 else
 	AVCODEC_CFLAGS=$pkg_cv_AVCODEC_CFLAGS
 	AVCODEC_LIBS=$pkg_cv_AVCODEC_LIBS
