@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
@@ -232,11 +233,11 @@ int segmenter_init(SegmenterContext *context, AVFormatContext *source, char* fil
     
     if (video_index < 0) {
         switch (source->streams[audio_index]->codec->codec_id) {
-            case CODEC_ID_AAC:
+            case AV_CODEC_ID_AAC:
                 oformat = av_guess_format(kFormatADTS, NULL, NULL);
                 context->extension = kExtensionAAC;
                 break;
-            case CODEC_ID_MP3:    
+            case AV_CODEC_ID_MP3:
                 oformat = av_guess_format(kFormatMP3, NULL, NULL);
                 context->extension = kExtensionMP3;
             default:
@@ -301,7 +302,7 @@ static inline double segment_duration(SegmenterContext *context, unsigned int se
  * @return 0 on success, negative error code on failure
  */
 static int start_segment(SegmenterContext *context) {
-    
+
     snprintf(context->buf, context->buf_size, "%s/%s%u.%s", context->file_base_name, context->media_base_name, context->segment_index, context->extension);
     
     if (avio_open(&context->output->pb, context->buf, AVIO_FLAG_WRITE)) {
@@ -309,7 +310,7 @@ static int start_segment(SegmenterContext *context) {
     }
     
     if (context->segment_index == 0) {
-        avformat_write_header(context->output, NULL);
+        return avformat_write_header(context->output, NULL);
     }
     
     return 0;
@@ -439,7 +440,7 @@ int segmenter_write_pkt(SegmenterContext* context, AVFormatContext *source, AVPa
     stream = source->streams[pkt->stream_index];
     
     if (pkt->stream_index != context->source_audio_index && pkt->stream_index != context->source_video_index) {
-        av_free_packet(pkt);
+        av_packet_unref(pkt);
         return 0;
     }
     
@@ -472,9 +473,9 @@ int segmenter_write_pkt(SegmenterContext* context, AVFormatContext *source, AVPa
         
         av_bitstream_filter_filter(context->bfilter, context->video->codec, NULL, &_pkt.data, &_pkt.size, pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
         
-        av_free_packet(&opkt);
+        av_packet_unref(&opkt);
         opkt = _pkt;
-        opkt.destruct = av_destruct_packet;
+        // opkt.destruct = av_destruct_packet;
     }  
     
     context->duration = opkt.pts * av_q2d(output_stream->time_base);
@@ -499,7 +500,7 @@ int segmenter_write_pkt(SegmenterContext* context, AVFormatContext *source, AVPa
     
     
     av_write_frame(context->output , &opkt);
-    av_free_packet(&opkt);
+    av_packet_unref(&opkt);
     
     return 0;
 }
