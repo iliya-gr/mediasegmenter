@@ -26,6 +26,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifndef AV_INPUT_BUFFER_PADDING_SIZE
+#define AV_INPUT_BUFFER_PADDING_SIZE FF_INPUT_BUFFER_PADDING_SIZE
+#endif
+
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 
 static const char* kExtensionAAC    = "aac";
@@ -59,7 +63,7 @@ static AVStream* copy_stream(AVFormatContext *context, AVStream *source_stream) 
     output_context->rc_max_rate = source_context->rc_max_rate;
     output_context->rc_buffer_size = source_context->rc_buffer_size;
     output_context->field_order = source_context->field_order;
-    output_context->extradata = av_mallocz(source_context->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE);
+    output_context->extradata = av_mallocz(source_context->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
     
     if (!output_context->extradata) {
         exit(-1);
